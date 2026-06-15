@@ -1,6 +1,6 @@
 {
   "name": "xueqiu-mcp-server",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "雪球 MCP Server - 追踪大V动态、查看自选股与组合持仓、获取实时行情与资讯",
   "type": "module",
   "main": "dist/index.js",

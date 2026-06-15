@@ -1,7 +1,7 @@
 /**
  * Xueqiu API Client (v2)
  *
- * Token 仅通过环境变量 XUEQIU_TOKEN 配置，不再提供运行时设置接口。
+ * Token 通过环境变量 XUEQIU_TOKEN 配置；匿名 token 仅保存在内存中。
  *
  * Domains:
  *  - api.xueqiu.com     → 社交 API（无 WAF）
@@ -9,15 +9,10 @@
  *  - xueqiu.com         → 用户搜索、关注列表（需要登录 token）
  */
 
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
-import { join } from "node:path";
-import { homedir } from "node:os";
-
 const API_BASE = "https://api.xueqiu.com";
 const MAIN_BASE = "https://xueqiu.com";
 const STOCK_BASE = "https://stock.xueqiu.com/v5/stock";
-const CONFIG_DIR = join(homedir(), ".xueqiu-mcp");
-const CONFIG_FILE = join(CONFIG_DIR, "config.json");
+const REQUEST_TIMEOUT_MS = 15_000;
 
 const DEFAULT_HEADERS = {
   "User-Agent":
@@ -226,54 +221,39 @@ export interface CubeHolding {
   [key: string]: unknown;
 }
 
-interface StoredConfig {
-  token?: string;
-}
-
 // ─── Client ────────────────────────────────────────────────────────
 
 export class XueqiuClient {
   private token: string;
   private tokenExpiry: number = 0;
+  private tokenSource: "env" | "anonymous" | "none" = "none";
 
   constructor() {
-    const envToken = process.env.XUEQIU_TOKEN;
-    const cfg = this.loadConfig();
-
+    const envToken = process.env.XUEQIU_TOKEN?.trim();
     if (envToken) {
       this.token = envToken.trim();
-    } else if (cfg.token) {
-      this.token = cfg.token;
+      this.tokenSource = "env";
     } else {
-      // Try to fetch an anonymous token at startup
       this.token = "";
     }
     this.tokenExpiry = Date.now() + 24 * 60 * 60 * 1000;
   }
 
   get isAuthenticated(): boolean {
-    return this.token.length > 0;
+    return this.tokenSource === "env" && this.token.length > 0;
   }
 
-  private loadConfig(): StoredConfig {
-    try {
-      if (existsSync(CONFIG_FILE)) {
-        return JSON.parse(readFileSync(CONFIG_FILE, "utf-8"));
-      }
-    } catch { /* ignore */ }
-    return {};
-  }
-
-  private saveConfig(): void {
-    try {
-      mkdirSync(CONFIG_DIR, { recursive: true });
-      const cfg: StoredConfig = { token: this.token || undefined };
-      writeFileSync(CONFIG_FILE, JSON.stringify(cfg, null, 2));
-    } catch { /* ignore */ }
+  private requireLogin(action: string): void {
+    if (!this.isAuthenticated) {
+      throw new Error(`${action} 需要配置有效的 XUEQIU_TOKEN。匿名 token 不支持该操作。`);
+    }
   }
 
   /** Build cookie string for API requests */
   private async buildCookieString(): Promise<string> {
+    if (this.tokenSource === "env") {
+      return `xq_a_token=${this.token}`;
+    }
     if (!this.token || Date.now() >= this.tokenExpiry) {
       await this.fetchToken();
     }
@@ -286,6 +266,7 @@ export class XueqiuClient {
       method: "GET",
       headers: { "User-Agent": DEFAULT_HEADERS["User-Agent"] },
       redirect: "manual",
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });
 
     const setCookieHeaders = res.headers.getSetCookie?.() ?? [];
@@ -295,7 +276,7 @@ export class XueqiuClient {
       if (match) {
         this.token = match[1];
         this.tokenExpiry = Date.now() + 23 * 60 * 60 * 1000;
-        this.saveConfig();
+        this.tokenSource = "anonymous";
         return;
       }
     }
@@ -306,7 +287,7 @@ export class XueqiuClient {
     if (match) {
       this.token = match[1];
       this.tokenExpiry = Date.now() + 23 * 60 * 60 * 1000;
-      this.saveConfig();
+      this.tokenSource = "anonymous";
       return;
     }
 
@@ -340,6 +321,7 @@ export class XueqiuClient {
         ...DEFAULT_HEADERS,
         Cookie: cookieString,
       },
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });
 
     if (!res.ok) {
@@ -383,6 +365,7 @@ export class XueqiuClient {
         "Content-Type": "application/x-www-form-urlencoded",
       },
       body: formBody.toString(),
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });
 
     if (!res.ok) {
@@ -411,6 +394,7 @@ export class XueqiuClient {
   }
 
   async getCurrentUser(): Promise<XueqiuUser> {
+    this.requireLogin("获取当前登录用户信息");
     return this.get<XueqiuUser>("/user/show.json", {}, "main");
   }
 
@@ -735,6 +719,7 @@ export class XueqiuClient {
 
   /** 获取自选股分组列表（包含所有分类：关注、股票、基金） */
   async getWatchlists(): Promise<Watchlist[]> {
+    this.requireLogin("获取自己的自选股分组");
     const res = await this.get<{
       data?: {
         cubes?: Array<{ id: number; name: string; symbol_count?: number; category?: number; type?: number }>;
@@ -777,6 +762,7 @@ export class XueqiuClient {
    *  使用 /v4/stock/portfolio/stocks.json (api.xueqiu.com)
    *  关键：用 uid 参数可查看他人自选股（tuid 仅返回自己的） */
   async getWatchlistStocks(pid: number, category: number = 0, type: number = -1, userId?: string | number): Promise<{ stocks: WatchlistStock[] }> {
+    if (!userId) this.requireLogin("查看自己的自选股");
     const uid = userId ?? (await this.getCurrentUser()).id;
     const res = await this.get<{ stocks?: WatchlistStock[] }>(
       "/v4/stock/portfolio/stocks.json",
@@ -827,6 +813,7 @@ export class XueqiuClient {
 
   /** 添加股票到自选分组 */
   async addToWatchlist(pid: number, symbols: string[]): Promise<boolean> {
+    this.requireLogin("添加自选股");
     const res = await this.post<{ data?: boolean }>(
       "/portfolio/stock/add.json",
       { pid, symbols: symbols.join(",") },
@@ -837,6 +824,7 @@ export class XueqiuClient {
 
   /** 从自选中彻底删除股票 */
   async removeFromWatchlist(symbols: string[]): Promise<boolean> {
+    this.requireLogin("删除自选股");
     const res = await this.post<{ data?: boolean }>(
       "/service/v5/stock/portfolio/stock/cancel",
       { symbols: symbols.join(",") },
@@ -847,6 +835,7 @@ export class XueqiuClient {
 
   /** 创建新的自选分组 */
   async createWatchlist(name: string): Promise<Watchlist | null> {
+    this.requireLogin("创建自选分组");
     const res = await this.post<{ data?: Watchlist }>(
       "/portfolio/create.json",
       { pnames: name, category: 1 },
@@ -857,6 +846,7 @@ export class XueqiuClient {
 
   /** 删除自选分组 */
   async deleteWatchlist(pid: number): Promise<boolean> {
+    this.requireLogin("删除自选分组");
     const res = await this.post<{ data?: boolean }>(
       "/portfolio/delete.json",
       { pid },

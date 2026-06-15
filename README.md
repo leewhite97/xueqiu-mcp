@@ -1,71 +1,37 @@
 # xueqiu-mcp
 
-雪球（Xueqiu）MCP Server，为 AI 助手提供雪球社区数据访问能力。支持追踪大 V 动态、查看自选股与组合持仓、获取实时行情与资讯，共 28 个工具。
+An MCP server for Xueqiu (Snowball) that exposes community posts, stock quotes, watchlists, portfolios, and market news to AI assistants through standard Model Context Protocol tools.
 
-## 功能概览
+It is designed for Claude Desktop, Cursor, Codex, QoderWork, and other MCP-compatible clients that can launch stdio servers.
 
-| 类别 | 工具数 | 说明 |
-|------|--------|------|
-| 社交 / 大 V 追踪 | 11 | 用户搜索、帖子、文章、评论、热门、KOL、资讯 |
-| 股票行情 | 8 | 实时行情、批量报价、热门排行、选股器、公司信息、分红、行业 |
-| 自选股管理 | 7 | 查看/添加/删除自选，支持查看任意用户的自选股 |
-| 组合追踪 | 2 | 查看任意用户的雪球组合及持仓明细 |
+> This project relies on publicly reachable Xueqiu endpoints and an optional user cookie token. API availability, permissions, and response shapes may change without notice.
 
-## 工具清单
+## Highlights
 
-### 社交 / 大 V 追踪
+| Area | Tools | Capabilities |
+| --- | ---: | --- |
+| Community and KOL tracking | 11 | User search, profiles, following list, timelines, original articles, post details, comments, hot posts, stock KOLs, news feeds, and 7x24 live news |
+| Stock market data | 8 | Single-stock quotes, batch quotes, hot stocks, stock screener, company profiles, dividend history, industry/concept tags, and industry performance |
+| Watchlist management | 7 | Read personal or public user watchlists, inspect watchlist stocks, add/remove symbols, and manage folders |
+| Portfolio tracking | 2 | Read public Xueqiu portfolios and current holdings |
 
-| 工具 | 说明 | 参数 |
-|------|------|------|
-| `get_current_user` | 获取当前登录用户信息 | 无 |
-| `get_my_following` | 获取我的关注列表（自动翻页） | 无 |
-| `search_users` | 按关键词搜索雪球用户 | `query`, `page?`, `count?` |
-| `get_user_profile` | 获取用户详细资料 | `user_id` |
-| `get_user_posts` | 获取用户动态（含原创和转发） | `user_id`, `page?`, `count?` |
-| `get_user_articles` | 获取用户原创文章 | `user_id`, `page?`, `count?` |
-| `get_post_detail` | 获取帖子完整内容 | `post_id` |
-| `get_post_comments` | 获取帖子评论 | `post_id`, `page?`, `count?`, `sort?` |
-| `get_hot_posts` | 热门帖子排行 | `scope?`(day/week/month), `count?`, `page?` |
-| `get_stock_kol` | 获取某只股票的活跃大 V | `symbol`, `count?`, `start?` |
-| `get_news_feed` | 资讯 Feed 流 | `category?`(headline/a_stock/us_stock/hk_stock/fund/live), `count?` |
+## Use Cases
 
-### 股票行情
+- Track recent posts, long-form articles, and discussions from Xueqiu users or market KOLs.
+- Query real-time quotes and valuation metrics for A-shares, Hong Kong stocks, and US stocks.
+- Inspect your own watchlists or public watchlists from other Xueqiu users.
+- Pull Xueqiu hot discussions, news feeds, and 7x24 live updates into AI workflows.
+- Combine stock screening, industry data, and company profiles for research workflows.
 
-| 工具 | 说明 | 参数 |
-|------|------|------|
-| `get_stock_quote` | 单只股票详细行情（现价、PE、PB、市值、股息率等） | `symbol` |
-| `get_batch_quotes` | 批量获取多只股票行情 | `symbols`(逗号分隔) |
-| `get_hot_stocks` | 热门股票排行榜 | `market?`(A/HK/US), `count?` |
-| `screen_stocks` | 股票筛选器（按涨跌幅、市值、PE 等排序） | `market?`, `order_by?`, `order?`, `page?`, `size?` |
-| `get_company_profile` | A 股公司基本信息（名称、法人、主营业务等） | `symbol` |
-| `get_stock_dividend` | A 股分红送转历史 | `symbol` |
-| `get_stock_industry` | 股票所属行业/概念板块 | `symbol` |
-| `get_industry_list` | 行业板块列表及涨跌数据 | `level?` |
+## Installation
 
-### 自选股管理
+### Requirements
 
-| 工具 | 说明 | 参数 |
-|------|------|------|
-| `get_watchlists` | 获取自己的自选股分组列表 | 无 |
-| `get_user_watchlists` | 获取任意用户的自选股分组（文件夹 + 数量统计） | `user_id` |
-| `get_watchlist_stocks` | 获取分组下的股票列表（传入 `user_id` 可查看他人自选） | `pid`, `category?`, `user_id?` |
-| `add_to_watchlist` | 添加股票到自选分组 | `pid`, `symbols` |
-| `remove_from_watchlist` | 从自选中删除股票 | `symbols` |
-| `create_watchlist` | 创建新的自选分组 | `name` |
-| `delete_watchlist` | 删除自选分组 | `pid` |
+- Node.js 18 or later
+- npm
+- An MCP client that supports stdio servers
 
-常用 `pid` 值：`-1`=全部、`-5`=沪深、`-6`=美股、`-7`=港股。
-
-### 组合追踪
-
-| 工具 | 说明 | 参数 |
-|------|------|------|
-| `get_user_cubes` | 获取用户的投资组合列表（名称、收益率、关注人数） | `user_id`, `page?`, `count?` |
-| `get_cube_holdings` | 获取组合的当前持仓（股票名称、代码、仓位占比） | `cube_symbol` |
-
-## 安装
-
-### 1. 安装依赖并编译
+### Build Locally
 
 ```bash
 git clone <repo-url>
@@ -74,117 +40,180 @@ npm install
 npm run build
 ```
 
-### 2. 获取 Token
+The compiled server entrypoint is `dist/index.js`.
 
-1. 在浏览器中登录 https://xueqiu.com
-2. 按 F12 → Application → Cookies → xueqiu.com
-3. 复制 `xq_a_token` 的值
+## Authentication
 
-### 3. 配置 MCP 客户端
+Set `XUEQIU_TOKEN` to a logged-in `xq_a_token` copied from your browser. Without this environment variable, the server will try to fetch an anonymous token in memory. Anonymous mode can access some public endpoints, but login-required features such as current-user data and watchlist writes will be unavailable.
 
-#### Claude Desktop / Cursor / QoderWork
+### Get `xq_a_token`
 
-在 MCP 客户端配置文件中添加：
+1. Log in to [Xueqiu](https://xueqiu.com) in your browser.
+2. Open Developer Tools and go to `Application` / `Storage`.
+3. Select `Cookies` for `https://xueqiu.com`.
+4. Copy the value of `xq_a_token`.
+
+### Claude Desktop / Cursor / QoderWork
+
+Add the server to your MCP client configuration:
 
 ```json
 {
   "mcpServers": {
     "xueqiu-mcp": {
       "command": "node",
-      "args": ["/你的路径/xueqiu-mcp/dist/index.js"],
+      "args": ["/path/to/xueqiu-mcp/dist/index.js"],
       "env": {
-        "XUEQIU_TOKEN": "你的 xq_a_token 值"
+        "XUEQIU_TOKEN": "your xq_a_token value"
       }
     }
   }
 }
 ```
 
-#### Codex CLI
+### Codex CLI
 
-编辑 `~/.codex/config.toml`，添加：
+Add the server to `~/.codex/config.toml`:
 
 ```toml
 [mcp_servers.xueqiu-mcp]
 command = "node"
-args = ["/你的路径/xueqiu-mcp/dist/index.js"]
-env = { XUEQIU_TOKEN = "你的 xq_a_token 值" }
+args = ["/path/to/xueqiu-mcp/dist/index.js"]
+env = { XUEQIU_TOKEN = "your xq_a_token value" }
 ```
 
-保存后重启 Codex 即可生效。
+Restart your MCP client after saving the configuration.
 
-将路径和 Token 替换为你的实际值。若未配置 Token，服务会自动获取匿名 Token（部分功能受限）。
+## Tools
 
-## 使用示例
+### Community and KOL Tracking
 
-### 追踪大 V
+| Tool | Description | Parameters |
+| --- | --- | --- |
+| `get_current_user` | Get the current logged-in user profile | None |
+| `get_my_following` | Get the current user's following list with automatic pagination | None |
+| `search_users` | Search Xueqiu users by keyword | `query`, `page?`, `count?` |
+| `get_user_profile` | Get a user's detailed profile | `user_id` |
+| `get_user_posts` | Get a user's timeline, including original and reposted content | `user_id`, `page?`, `count?` |
+| `get_user_articles` | Get a user's original long-form articles | `user_id`, `page?`, `count?` |
+| `get_post_detail` | Get full content for a post or article | `post_id` |
+| `get_post_comments` | Get comments for a post | `post_id`, `page?`, `count?`, `sort?` |
+| `get_hot_posts` | Get hot posts by day, week, or month | `scope?`, `count?`, `page?` |
+| `get_stock_kol` | Get active users for a stock symbol | `symbol`, `count?`, `start?` |
+| `get_news_feed` | Get Xueqiu news feeds or 7x24 live news | `category?`, `count?` |
 
-> "看看药神最近发了什么帖子"
+`get_hot_posts.scope` supports `day`, `week`, and `month`. `get_news_feed.category` supports `headline`, `a_stock`, `us_stock`, `hk_stock`, `fund`, and `live`.
 
-> "搜索雪球上关注新能源的大 V"
+### Stock Market Data
 
-### 查看他人自选股
+| Tool | Description | Parameters |
+| --- | --- | --- |
+| `get_stock_quote` | Get detailed quote and valuation metrics for one stock | `symbol` |
+| `get_batch_quotes` | Get quotes for multiple symbols | `symbols` |
+| `get_hot_stocks` | Get hot stock rankings | `market?`, `count?` |
+| `screen_stocks` | Sort and screen stocks by percent change, market cap, PE, PB, turnover, amount, or volume | `market?`, `order_by?`, `order?`, `page?`, `size?` |
+| `get_company_profile` | Get A-share company profile data | `symbol` |
+| `get_stock_dividend` | Get A-share dividend and allotment history | `symbol` |
+| `get_stock_industry` | Get industry and concept tags for a stock | `symbol` |
+| `get_industry_list` | Get industry sectors and performance data | `level?` |
 
-> "帮我看看药神（ID: 2292705444）的自选股里有什么"
+Symbol examples: `SH600519`, `SZ000001`, `00700`, `AAPL`.
 
-> "看看某用户的 A 股自选列表"
+### Watchlist Management
 
-### 行情查询
+| Tool | Description | Parameters |
+| --- | --- | --- |
+| `get_watchlists` | Get the current user's watchlist folders | None |
+| `get_user_watchlists` | Get public watchlist folders for any user | `user_id` |
+| `get_watchlist_stocks` | Get stocks in a watchlist folder, optionally for a public user | `pid`, `category?`, `user_id?` |
+| `add_to_watchlist` | Add symbols to a watchlist folder | `pid`, `symbols` |
+| `remove_from_watchlist` | Remove symbols from watchlists | `symbols` |
+| `create_watchlist` | Create a new watchlist folder | `name` |
+| `delete_watchlist` | Delete a watchlist folder | `pid` |
 
-> "贵州茅台现在什么价格？"
+Common system folder IDs include `-1` for all, `-5` for A-shares, `-6` for US stocks, and `-7` for Hong Kong stocks. Prefer IDs returned by `get_watchlists` or `get_user_watchlists`.
 
-> "帮我对比一下宁德时代和比亚迪的行情"
+### Portfolio Tracking
 
-> "今天 A 股涨幅最大的有哪些？"
+| Tool | Description | Parameters |
+| --- | --- | --- |
+| `get_user_cubes` | Get public portfolios created by a Xueqiu user | `user_id`, `page?`, `count?` |
+| `get_cube_holdings` | Get current holdings for a portfolio | `cube_symbol` |
 
-### 组合追踪
+## Examples
 
-> "看看某用户有哪些投资组合"
-
-> "ZH2001629 这个组合目前持仓了哪些股票？"
-
-### 资讯获取
-
-> "今天雪球上有什么热门讨论？"
-
-> "看看最新的美股资讯"
-
-> "雪球 7x24 快讯"
-
-## 技术栈
-
-- **运行时**：Node.js（ES2022 / ESM）
-- **MCP SDK**：@modelcontextprotocol/sdk ^1.12.1
-- **参数校验**：zod ^3.23.8
-- **语言**：TypeScript ^5.6.0
-
-## 项目结构
-
+```text
+Show me the latest posts from this Xueqiu user.
 ```
+
+```text
+Search for Xueqiu users who discuss new energy stocks.
+```
+
+```text
+What is in user 2292705444's public watchlist?
+```
+
+```text
+Get the current quote, PE, PB, and dividend yield for SH600519.
+```
+
+```text
+Compare quotes for SH600519, SZ300750, and AAPL.
+```
+
+```text
+What are the hottest A-share stocks today?
+```
+
+```text
+Show current holdings for portfolio ZH2001629.
+```
+
+```text
+Show the latest Xueqiu 7x24 live news.
+```
+
+## Development
+
+```bash
+npm run dev      # Start from TypeScript source with tsx
+npm run build    # Compile TypeScript to dist/
+npm start        # Start the compiled MCP server
+```
+
+## Architecture
+
+```text
 xueqiu-mcp/
 ├── src/
-│   ├── index.ts          # MCP Server 入口 & 工具注册
-│   └── xueqiu-api.ts     # 雪球 API 客户端封装
-├── dist/                 # 编译输出
-├── package.json
-├── tsconfig.json
+│   ├── index.ts          # MCP server entrypoint, tool registration, and response formatting
+│   └── xueqiu-api.ts     # Xueqiu API client, token handling, and HTTP helpers
+├── dist/                 # Compiled output
+├── package.json          # Package metadata and scripts
+├── tsconfig.json         # TypeScript configuration
 └── README.md
 ```
 
-## 注意事项
+The implementation intentionally keeps the runtime small:
 
-- 本工具基于雪球公开可访问的数据接口，接口可能随时调整。
-- `xq_a_token` 存在有效期限制，过期后需重新从浏览器获取。
-- 查看他人自选股依赖对方的隐私设置，部分用户的自选可能不可见。
-- 请合理控制请求频率。
+- Node.js / ESM / ES2022
+- TypeScript
+- `@modelcontextprotocol/sdk`
+- `zod`
 
-## 免责声明
+## Data, Permissions, and Safety
 
-- 本项目仅供个人学习与研究用途，不构成任何投资建议。
-- 本项目与北京雪球信息咨询有限公司（雪球）无关，未获得雪球的官方授权或认可。
-- 数据来源于雪球平台的公开信息，使用者应自行遵守雪球的《用户协议》及相关法律法规。
-- 因使用本项目产生的一切后果，由使用者自行承担。
-- 如涉及版权问题，请联系作者进行处理。
+- `XUEQIU_TOKEN` is read from the environment and should not be committed to source control.
+- Anonymous tokens are fetched only when needed and are kept in memory.
+- Login-required tools fail fast with a clear error when `XUEQIU_TOKEN` is missing.
+- Visibility of other users' watchlists, portfolios, and profiles depends on their privacy settings and Xueqiu's API permissions.
+- Xueqiu may change endpoints, fields, rate limits, or access policies at any time.
+- Use reasonable request rates and respect Xueqiu's terms of service.
+
+## Disclaimer
+
+This project is for personal learning, research, and automation assistance only. It is not investment advice, trading advice, or a recommendation to buy or sell securities. This project is not affiliated with, endorsed by, or officially authorized by Xueqiu or Beijing Xueqiu Information Technology Co., Ltd. Users are responsible for complying with Xueqiu's terms, platform rules, and applicable laws. All consequences arising from use of this project are the user's responsibility.
 
 ## License
 
